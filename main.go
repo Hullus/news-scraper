@@ -5,6 +5,7 @@ import (
 	"github.com/gocolly/colly/v2"
 	"log"
 	"strings"
+	"sync"
 )
 
 type Distributor struct {
@@ -19,14 +20,26 @@ type NewsItem struct {
 }
 
 func main() {
+	var wg sync.WaitGroup
+	defer wg.Done()
+
 	newsDistributors := getDistributors()
 	for _, distributor := range newsDistributors {
-		news, err := scrapeNews(distributor)
-		if err != nil {
-			log.Fatal(err)
-		}
-		fmt.Println(news)
+		wg.Add(1)
+
+		go func() {
+			news, err := scrapeNews(distributor)
+			if err != nil {
+				log.Fatal(err)
+			}
+			fmt.Println(distributor.basePath)
+			fmt.Println(news)
+		}()
 	}
+
+	wg.Wait()
+
+	fmt.Println("Done")
 }
 
 func scrapeNews(distributor Distributor) ([]NewsItem, error) {
