@@ -7,24 +7,29 @@ import (
 	"strings"
 )
 
+type Distributor struct {
+	basePath     string
+	newsFeedPath string
+	regex        string
+}
+
 type NewsItem struct {
 	Title string
 	Url   string
 }
 
 func main() {
-	baseUrl := "https://www.radiotavisupleba.ge"
-	news, err := scrapeNews(baseUrl)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	for _, item := range news {
-		fmt.Printf("Title: %s\nURL: %s\n\n", item.Title, item.Url)
+	newsDistributors := getDistributors()
+	for _, distributor := range newsDistributors {
+		news, err := scrapeNews(distributor)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Println(news)
 	}
 }
 
-func scrapeNews(baseUrl string) ([]NewsItem, error) {
+func scrapeNews(distributor Distributor) ([]NewsItem, error) {
 	var newsItems []NewsItem
 
 	c := colly.NewCollector(
@@ -35,7 +40,7 @@ func scrapeNews(baseUrl string) ([]NewsItem, error) {
 		fmt.Printf("Request URL: %v failed with response: %v\nError: %v", r.Request.URL, r, err)
 	})
 
-	c.OnHTML(".media-block__title", func(e *colly.HTMLElement) {
+	c.OnHTML(distributor.regex, func(e *colly.HTMLElement) {
 		linkEl := e.DOM.ParentFiltered("a")
 		Url, exists := linkEl.Attr("href")
 		if !exists {
@@ -44,7 +49,7 @@ func scrapeNews(baseUrl string) ([]NewsItem, error) {
 
 		fullUrl := Url
 		if !strings.HasPrefix(Url, "http") {
-			fullUrl = baseUrl + Url
+			fullUrl = distributor.basePath + Url
 		}
 
 		newsItem := NewsItem{
@@ -55,10 +60,50 @@ func scrapeNews(baseUrl string) ([]NewsItem, error) {
 		newsItems = append(newsItems, newsItem)
 	})
 
-	err := c.Visit(baseUrl + "/news")
+	err := c.Visit(distributor.newsFeedPath)
 	if err != nil {
 		return nil, err
 	}
 
 	return newsItems, nil
+}
+
+func getDistributors() []Distributor {
+	newsDistributors := map[string]struct {
+		newsFeedPath string
+		regex        string
+	}{
+		"https://www.radiotavisupleba.ge": {
+			newsFeedPath: "https://www.radiotavisupleba.ge/news",
+			regex:        `.media-block__title`,
+		},
+		"https://netgazeti.ge/": {
+			newsFeedPath: "https://netgazeti.ge/category/news/",
+			regex:        `another-pattern`,
+		},
+		"https://formula.ge/": {
+			newsFeedPath: "https://formulanews.ge/Category/All",
+			regex:        `some-other-pattern`,
+		},
+		"https://www.imedi.ge/": {
+			newsFeedPath: "https://imedinews.ge/ge/all-news",
+			regex:        `pattern-for-imedi`,
+		},
+		"https://1tv.ge/": {
+			newsFeedPath: "https://1tv.ge/akhali-ambebi/politika/",
+			regex:        `pattern-for-1tv`,
+		},
+	}
+
+	var distributors []Distributor
+
+	for basePath, info := range newsDistributors {
+		distributors = append(distributors, Distributor{
+			basePath:     basePath,
+			newsFeedPath: info.newsFeedPath,
+			regex:        info.regex,
+		})
+	}
+
+	return distributors
 }
