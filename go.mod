@@ -1,6 +1,6 @@
-module awesomeProject6
+module web-scraper
 
-go 1.21
+go 1.23.4
 
 require (
 	github.com/PuerkitoBio/goquery v1.5.1 // indirect
