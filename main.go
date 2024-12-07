@@ -1,9 +1,11 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/gocolly/colly/v2"
 	"log"
+	"net/http"
 	"sync"
 )
 
@@ -15,12 +17,31 @@ type Distributor struct {
 }
 
 type NewsItem struct {
-	Title string
-	Url   string
+	Title string `json:"title"`
+	Url   string `json:"Url"`
 }
 
 func main() {
+	router := http.NewServeMux()
+
+	router.HandleFunc("GET /news", func(w http.ResponseWriter, r *http.Request) {
+		output, _ := parallelScraper()
+		w.Header().Set("Content-Type", "application/json")
+		err := json.NewEncoder(w).Encode(output)
+		if err != nil {
+			fmt.Println(err)
+		}
+	})
+
+	err := http.ListenAndServe(":8080", router)
+	if err != nil {
+		fmt.Println(err)
+	}
+}
+
+func parallelScraper() (map[string][]NewsItem, error) {
 	var wg sync.WaitGroup
+	result := make(map[string][]NewsItem)
 
 	newsDistributors := getDistributors()
 	for _, distributor := range newsDistributors {
@@ -29,18 +50,16 @@ func main() {
 		go func(distributor Distributor) {
 			defer wg.Done()
 			news, err := scrapeNews(distributor)
-			fmt.Println(distributor)
 			if err != nil {
 				log.Fatal(err)
 			}
-			fmt.Println(distributor.basePath)
-			fmt.Println(news)
+			result[distributor.basePath] = news
 		}(distributor)
 	}
 
 	wg.Wait()
 
-	fmt.Println("Done")
+	return result, nil
 }
 
 func scrapeNews(distributor Distributor) ([]NewsItem, error) {
