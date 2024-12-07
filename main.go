@@ -105,7 +105,7 @@ func getDistributors() []Distributor {
 			regex:              ".col-lg-4",
 			extractingFunction: netGazeti,
 		},
-		"https://formula.ge/": {
+		"https://formula.ge": {
 			name:               "formula",
 			newsFeedPath:       "https://formulanews.ge/Category/All",
 			regex:              `.news__box__card`,
