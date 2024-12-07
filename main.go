@@ -47,7 +47,6 @@ func parallelScraper() (map[string][]NewsItem, error) {
 	newsDistributors := getDistributors()
 	for _, distributor := range newsDistributors {
 		wg.Add(1)
-		fmt.Println(distributor)
 		go func(distributor Distributor) {
 			defer wg.Done()
 			news, err := scrapeNews(distributor)
@@ -105,7 +104,7 @@ func getDistributors() []Distributor {
 			regex:              ".col-lg-4",
 			extractingFunction: netGazeti,
 		},
-		"https://formula.ge": {
+		"https://formulanews.ge": {
 			name:               "formula",
 			newsFeedPath:       "https://formulanews.ge/Category/All",
 			regex:              `.news__box__card`,
