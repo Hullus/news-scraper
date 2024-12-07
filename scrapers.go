@@ -56,3 +56,51 @@ func formula(e *colly.HTMLElement, distributor Distributor, newsItems *[]NewsIte
 
 	*newsItems = append(*newsItems, newsItem)
 }
+
+func getDistributors() []Distributor {
+	newsDistributors := map[string]struct {
+		name               string
+		newsFeedPath       string
+		regex              string
+		extractingFunction func(e *colly.HTMLElement, distributor Distributor, newsItems *[]NewsItem)
+	}{
+		"https://www.radiotavisupleba.ge": {
+			name:               "radioFreedom",
+			newsFeedPath:       "https://www.radiotavisupleba.ge/news",
+			regex:              `.media-block`,
+			extractingFunction: radioFreedom,
+		},
+		"https://netgazeti.ge/": {
+			name:               "netgazeti",
+			newsFeedPath:       "https://netgazeti.ge/category/news/",
+			regex:              ".col-lg-4",
+			extractingFunction: netGazeti,
+		},
+		"https://formulanews.ge": {
+			name:               "formula",
+			newsFeedPath:       "https://formulanews.ge/Category/All",
+			regex:              `.news__box__card`,
+			extractingFunction: formula,
+		},
+		"https://www.imedi.ge/": {
+			name:               "imedi",
+			newsFeedPath:       "https://imedinews.ge/ge/all-news",
+			regex:              `.news-list .single-item`,
+			extractingFunction: imedi,
+		},
+	}
+
+	var distributors []Distributor
+
+	for basePath, info := range newsDistributors {
+		distributors = append(distributors, Distributor{
+			name:               info.name,
+			basePath:           basePath,
+			newsFeedPath:       info.newsFeedPath,
+			regex:              info.regex,
+			extractingFunction: info.extractingFunction,
+		})
+	}
+
+	return distributors
+}
