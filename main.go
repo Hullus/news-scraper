@@ -18,7 +18,7 @@ type Distributor struct {
 
 type NewsItem struct {
 	Title string `json:"title"`
-	Url   string `json:"Url"`
+	Url   string `json:"url"`
 }
 
 func main() {
