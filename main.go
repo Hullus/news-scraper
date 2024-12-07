@@ -10,6 +10,7 @@ import (
 )
 
 type Distributor struct {
+	name               string
 	basePath           string
 	newsFeedPath       string
 	regex              string
@@ -46,14 +47,14 @@ func parallelScraper() (map[string][]NewsItem, error) {
 	newsDistributors := getDistributors()
 	for _, distributor := range newsDistributors {
 		wg.Add(1)
-
+		fmt.Println(distributor)
 		go func(distributor Distributor) {
 			defer wg.Done()
 			news, err := scrapeNews(distributor)
 			if err != nil {
 				log.Fatal(err)
 			}
-			result[distributor.basePath] = news
+			result[distributor.name] = news
 		}(distributor)
 	}
 
@@ -87,26 +88,31 @@ func scrapeNews(distributor Distributor) ([]NewsItem, error) {
 
 func getDistributors() []Distributor {
 	newsDistributors := map[string]struct {
+		name               string
 		newsFeedPath       string
 		regex              string
 		extractingFunction func(e *colly.HTMLElement, distributor Distributor, newsItems *[]NewsItem)
 	}{
 		"https://www.radiotavisupleba.ge": {
+			name:               "radioFreedom",
 			newsFeedPath:       "https://www.radiotavisupleba.ge/news",
 			regex:              `.media-block`,
 			extractingFunction: radioFreedom,
 		},
 		"https://netgazeti.ge/": {
+			name:               "netgazeti",
 			newsFeedPath:       "https://netgazeti.ge/category/news/",
 			regex:              ".col-lg-4",
 			extractingFunction: netGazeti,
 		},
 		"https://formula.ge/": {
+			name:               "formula",
 			newsFeedPath:       "https://formulanews.ge/Category/All",
 			regex:              `.news__box__card`,
 			extractingFunction: formula,
 		},
 		"https://www.imedi.ge/": {
+			name:               "imedi",
 			newsFeedPath:       "https://imedinews.ge/ge/all-news",
 			regex:              `.news-list .single-item`,
 			extractingFunction: imedi,
@@ -117,6 +123,7 @@ func getDistributors() []Distributor {
 
 	for basePath, info := range newsDistributors {
 		distributors = append(distributors, Distributor{
+			name:               info.name,
 			basePath:           basePath,
 			newsFeedPath:       info.newsFeedPath,
 			regex:              info.regex,
