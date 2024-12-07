@@ -4,14 +4,14 @@ import (
 	"fmt"
 	"github.com/gocolly/colly/v2"
 	"log"
-	"strings"
 	"sync"
 )
 
 type Distributor struct {
-	basePath     string
-	newsFeedPath string
-	regex        string
+	basePath           string
+	newsFeedPath       string
+	regex              string
+	extractingFunction func(e *colly.HTMLElement, distributor Distributor, newsItems *[]NewsItem)
 }
 
 type NewsItem struct {
@@ -21,20 +21,21 @@ type NewsItem struct {
 
 func main() {
 	var wg sync.WaitGroup
-	defer wg.Done()
 
 	newsDistributors := getDistributors()
 	for _, distributor := range newsDistributors {
 		wg.Add(1)
 
-		go func() {
+		go func(distributor Distributor) {
+			defer wg.Done()
 			news, err := scrapeNews(distributor)
+			fmt.Println(distributor)
 			if err != nil {
 				log.Fatal(err)
 			}
 			fmt.Println(distributor.basePath)
 			fmt.Println(news)
-		}()
+		}(distributor)
 	}
 
 	wg.Wait()
@@ -54,23 +55,7 @@ func scrapeNews(distributor Distributor) ([]NewsItem, error) {
 	})
 
 	c.OnHTML(distributor.regex, func(e *colly.HTMLElement) {
-		linkEl := e.DOM.ParentFiltered("a")
-		Url, exists := linkEl.Attr("href")
-		if !exists {
-			Url = "#"
-		}
-
-		fullUrl := Url
-		if !strings.HasPrefix(Url, "http") {
-			fullUrl = distributor.basePath + Url
-		}
-
-		newsItem := NewsItem{
-			Title: strings.TrimSpace(e.Text),
-			Url:   fullUrl,
-		}
-
-		newsItems = append(newsItems, newsItem)
+		distributor.extractingFunction(e, distributor, &newsItems)
 	})
 
 	err := c.Visit(distributor.newsFeedPath)
@@ -83,28 +68,29 @@ func scrapeNews(distributor Distributor) ([]NewsItem, error) {
 
 func getDistributors() []Distributor {
 	newsDistributors := map[string]struct {
-		newsFeedPath string
-		regex        string
+		newsFeedPath       string
+		regex              string
+		extractingFunction func(e *colly.HTMLElement, distributor Distributor, newsItems *[]NewsItem)
 	}{
 		"https://www.radiotavisupleba.ge": {
-			newsFeedPath: "https://www.radiotavisupleba.ge/news",
-			regex:        `.media-block__title`,
+			newsFeedPath:       "https://www.radiotavisupleba.ge/news",
+			regex:              `.media-block`,
+			extractingFunction: radioFreedom,
 		},
 		"https://netgazeti.ge/": {
-			newsFeedPath: "https://netgazeti.ge/category/news/",
-			regex:        `another-pattern`,
+			newsFeedPath:       "https://netgazeti.ge/category/news/",
+			regex:              ".col-lg-4",
+			extractingFunction: netGazeti,
 		},
 		"https://formula.ge/": {
-			newsFeedPath: "https://formulanews.ge/Category/All",
-			regex:        `some-other-pattern`,
+			newsFeedPath:       "https://formulanews.ge/Category/All",
+			regex:              `.news__box__card`,
+			extractingFunction: formula,
 		},
 		"https://www.imedi.ge/": {
-			newsFeedPath: "https://imedinews.ge/ge/all-news",
-			regex:        `pattern-for-imedi`,
-		},
-		"https://1tv.ge/": {
-			newsFeedPath: "https://1tv.ge/akhali-ambebi/politika/",
-			regex:        `pattern-for-1tv`,
+			newsFeedPath:       "https://imedinews.ge/ge/all-news",
+			regex:              `.news-list .single-item`,
+			extractingFunction: imedi,
 		},
 	}
 
@@ -112,9 +98,10 @@ func getDistributors() []Distributor {
 
 	for basePath, info := range newsDistributors {
 		distributors = append(distributors, Distributor{
-			basePath:     basePath,
-			newsFeedPath: info.newsFeedPath,
-			regex:        info.regex,
+			basePath:           basePath,
+			newsFeedPath:       info.newsFeedPath,
+			regex:              info.regex,
+			extractingFunction: info.extractingFunction,
 		})
 	}
 
