@@ -1,106 +1,53 @@
 package main
 
 import (
+	"fmt"
 	"github.com/gocolly/colly/v2"
-	"strings"
+	"log"
+	"sync"
 )
 
-func imedi(e *colly.HTMLElement, distributor Distributor, newsItems *[]NewsItem) {
-	newsItem := NewsItem{
-		Title: e.ChildText(".title"),
-		Url:   e.Attr("href"),
+func parallelScraper() (map[string][]NewsItem, error) {
+	var wg sync.WaitGroup
+	result := make(map[string][]NewsItem)
+
+	newsDistributors := getDistributors()
+	for _, distributor := range newsDistributors {
+		wg.Add(1)
+		go func(distributor Distributor) {
+			defer wg.Done()
+			news, err := scrapeNews(distributor)
+			if err != nil {
+				log.Fatal(err)
+			}
+			result[distributor.name] = news
+		}(distributor)
 	}
 
-	*newsItems = append(*newsItems, newsItem)
+	wg.Wait()
+
+	return result, nil
 }
 
-func radioFreedom(e *colly.HTMLElement, distributor Distributor, newsItems *[]NewsItem) {
-	title := e.ChildText(".media-block__title")
-	Url := e.ChildAttr("a", "href")
+func scrapeNews(distributor Distributor) ([]NewsItem, error) {
+	var newsItems []NewsItem
 
-	fullUrl := Url
-	if !strings.HasPrefix(Url, "http") {
-		fullUrl = distributor.basePath + Url
+	c := colly.NewCollector(
+		colly.AllowURLRevisit(),
+		colly.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"),
+	)
+	c.OnError(func(r *colly.Response, err error) {
+		fmt.Printf("Request URL: %v failed with response: %v\nError: %v", r.Request.URL, r, err)
+	})
+
+	c.OnHTML(distributor.regex, func(e *colly.HTMLElement) {
+		distributor.extractingFunction(e, distributor, &newsItems)
+	})
+
+	err := c.Visit(distributor.newsFeedPath)
+	if err != nil {
+		return nil, err
 	}
 
-	newsItem := NewsItem{
-		Title: strings.TrimSpace(title),
-		Url:   fullUrl,
-	}
-
-	*newsItems = append(*newsItems, newsItem)
-}
-
-func netGazeti(e *colly.HTMLElement, distributor Distributor, newsItems *[]NewsItem) {
-	newsItem := NewsItem{
-		Title: strings.TrimSpace(e.ChildText("h5 a")),
-		Url:   e.ChildAttr("h5 a", "href"),
-	}
-
-	*newsItems = append(*newsItems, newsItem)
-}
-
-func formula(e *colly.HTMLElement, distributor Distributor, newsItems *[]NewsItem) {
-	title := e.ChildText(".main__new__slider__desc a")
-	Url := e.ChildAttr(".main__new__slider__desc a", "href")
-
-	fullUrl := Url
-	if !strings.HasPrefix(Url, "http") {
-		fullUrl = distributor.basePath + Url
-	}
-
-	newsItem := NewsItem{
-		Title: strings.TrimSpace(title),
-		Url:   fullUrl,
-	}
-
-	*newsItems = append(*newsItems, newsItem)
-}
-
-func getDistributors() []Distributor {
-	newsDistributors := map[string]struct {
-		name               string
-		newsFeedPath       string
-		regex              string
-		extractingFunction func(e *colly.HTMLElement, distributor Distributor, newsItems *[]NewsItem)
-	}{
-		"https://www.radiotavisupleba.ge": {
-			name:               "radioFreedom",
-			newsFeedPath:       "https://www.radiotavisupleba.ge/news",
-			regex:              `.media-block`,
-			extractingFunction: radioFreedom,
-		},
-		"https://netgazeti.ge/": {
-			name:               "netgazeti",
-			newsFeedPath:       "https://netgazeti.ge/category/news/",
-			regex:              ".col-lg-4",
-			extractingFunction: netGazeti,
-		},
-		"https://formulanews.ge": {
-			name:               "formula",
-			newsFeedPath:       "https://formulanews.ge/Category/All",
-			regex:              `.news__box__card`,
-			extractingFunction: formula,
-		},
-		"https://www.imedi.ge/": {
-			name:               "imedi",
-			newsFeedPath:       "https://imedinews.ge/ge/all-news",
-			regex:              `.news-list .single-item`,
-			extractingFunction: imedi,
-		},
-	}
-
-	var distributors []Distributor
-
-	for basePath, info := range newsDistributors {
-		distributors = append(distributors, Distributor{
-			name:               info.name,
-			basePath:           basePath,
-			newsFeedPath:       info.newsFeedPath,
-			regex:              info.regex,
-			extractingFunction: info.extractingFunction,
-		})
-	}
-
-	return distributors
+	return newsItems, nil
 }
