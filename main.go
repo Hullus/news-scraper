@@ -22,8 +22,8 @@ func main() {
 	}
 	defer db.Close()
 
-	db.SetMaxOpenConns(25)
-	db.SetMaxIdleConns(5)
+	db.SetMaxOpenConns(10)
+	db.SetMaxIdleConns(3)
 
 	router.HandleFunc("POST /news", func(w http.ResponseWriter, r *http.Request) {
 		output, _ := parallelScraper()

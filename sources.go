@@ -11,6 +11,8 @@ func imedi(e *colly.HTMLElement, distributor Distributor, newsItems *[]NewsItem)
 		Url:   e.Attr("href"),
 	}
 
+	fraudCheck(newsItem)
+
 	*newsItems = append(*newsItems, newsItem)
 }
 
@@ -27,6 +29,7 @@ func radioFreedom(e *colly.HTMLElement, distributor Distributor, newsItems *[]Ne
 		Title: strings.TrimSpace(title),
 		Url:   fullUrl,
 	}
+	fraudCheck(newsItem)
 
 	*newsItems = append(*newsItems, newsItem)
 }
@@ -36,6 +39,7 @@ func netGazeti(e *colly.HTMLElement, distributor Distributor, newsItems *[]NewsI
 		Title: strings.TrimSpace(e.ChildText("h5 a")),
 		Url:   e.ChildAttr("h5 a", "href"),
 	}
+	fraudCheck(newsItem)
 
 	*newsItems = append(*newsItems, newsItem)
 }
@@ -53,6 +57,7 @@ func formula(e *colly.HTMLElement, distributor Distributor, newsItems *[]NewsIte
 		Title: strings.TrimSpace(title),
 		Url:   fullUrl,
 	}
+	fraudCheck(newsItem)
 
 	*newsItems = append(*newsItems, newsItem)
 }
@@ -103,4 +108,10 @@ func getDistributors() []Distributor {
 	}
 
 	return distributors
+}
+
+func fraudCheck(item NewsItem) {
+	if item.Title == "" || item.Url == "" {
+		return
+	}
 }

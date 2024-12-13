@@ -24,12 +24,6 @@ WHERE rn <= 10;`
 		newsItems = append(newsItems, newsItem)
 	}
 
-	for i, item := range newsItems {
-		fmt.Print(i)
-		fmt.Print("   ")
-		fmt.Println(item.Title)
-	}
-
 	return newsItems, nil
 }
 
