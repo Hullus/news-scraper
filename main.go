@@ -6,6 +6,7 @@ import (
 	"fmt"
 	_ "github.com/lib/pq"
 	"net/http"
+	"time"
 )
 
 var db *sql.DB
@@ -25,27 +26,21 @@ func main() {
 	db.SetMaxOpenConns(10)
 	db.SetMaxIdleConns(3)
 
-	router.HandleFunc("POST /news", func(w http.ResponseWriter, r *http.Request) {
-		output, _ := parallelScraper()
-		w.Header().Set("Content-Type", "application/json")
-		for s, items := range output {
-			err := insertData(items, s)
-			if err != nil {
-				fmt.Println(err)
-			}
-		}
-		err := json.NewEncoder(w).Encode(output)
-		if err != nil {
-			fmt.Println(err)
-		}
-	})
+	go scrapingScheduler()
 
 	router.HandleFunc("GET /news", func(w http.ResponseWriter, r *http.Request) {
 		output, err := getLastArticles()
 		if err != nil {
-			fmt.Println(err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
+
 		w.Header().Set("Content-Type", "application/json")
+		if err = json.NewEncoder(w).Encode(output); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
 		err = json.NewEncoder(w).Encode(output)
 		if err != nil {
 			fmt.Println(err)
@@ -55,5 +50,33 @@ func main() {
 	err = http.ListenAndServe(":8080", router)
 	if err != nil {
 		fmt.Println(err)
+	}
+}
+
+func scrapingScheduler() {
+	runScraper()
+
+	ticker := time.NewTicker(1 * time.Minute)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			runScraper()
+		}
+	}
+}
+
+func runScraper() {
+	output, err := parallelScraper()
+	if err != nil {
+		fmt.Printf("Scraping error: %v\n", err)
+		return
+	}
+
+	for s, items := range output {
+		if err := insertData(items, s); err != nil {
+			fmt.Printf("Insert error for source %s: %v\n", s, err)
+		}
 	}
 }
