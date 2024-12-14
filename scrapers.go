@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"github.com/gocolly/colly/v2"
 	"log"
+	"math"
 	"sync"
+	"time"
 )
 
 func parallelScraper() (map[string][]NewsItem, error) {
@@ -36,8 +38,18 @@ func scrapeNews(distributor Distributor) ([]NewsItem, error) {
 		colly.AllowURLRevisit(),
 		colly.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"),
 	)
+
+	retryCount := 0
+	maxRetries := 3
+
 	c.OnError(func(r *colly.Response, err error) {
-		fmt.Printf("Request URL: %v failed with response: %v\nError: %v", r.Request.URL, r, err)
+		if retryCount < maxRetries {
+			retryCount++
+			time.Sleep(time.Duration(math.Pow(2, float64(retryCount))) * time.Second)
+			r.Request.Retry()
+			return
+		}
+		err = fmt.Errorf("failed after %d retries: %w", maxRetries, err)
 	})
 
 	c.OnHTML(distributor.regex, func(e *colly.HTMLElement) {
