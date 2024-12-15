@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"github.com/gocolly/colly/v2"
 	"strings"
 )
@@ -10,8 +11,10 @@ func imedi(e *colly.HTMLElement, distributor Distributor, newsItems *[]NewsItem)
 		Title: e.ChildText(".title"),
 		Url:   e.Attr("href"),
 	}
-
-	fraudCheck(newsItem)
+	err := fraudCheck(newsItem)
+	if err != nil {
+		return
+	}
 
 	*newsItems = append(*newsItems, newsItem)
 }
@@ -29,7 +32,10 @@ func radioFreedom(e *colly.HTMLElement, distributor Distributor, newsItems *[]Ne
 		Title: strings.TrimSpace(title),
 		Url:   fullUrl,
 	}
-	fraudCheck(newsItem)
+	err := fraudCheck(newsItem)
+	if err != nil {
+		return
+	}
 
 	*newsItems = append(*newsItems, newsItem)
 }
@@ -39,7 +45,10 @@ func netGazeti(e *colly.HTMLElement, distributor Distributor, newsItems *[]NewsI
 		Title: strings.TrimSpace(e.ChildText("h5 a")),
 		Url:   e.ChildAttr("h5 a", "href"),
 	}
-	fraudCheck(newsItem)
+	err := fraudCheck(newsItem)
+	if err != nil {
+		return
+	}
 
 	*newsItems = append(*newsItems, newsItem)
 }
@@ -57,7 +66,10 @@ func formula(e *colly.HTMLElement, distributor Distributor, newsItems *[]NewsIte
 		Title: strings.TrimSpace(title),
 		Url:   fullUrl,
 	}
-	fraudCheck(newsItem)
+	err := fraudCheck(newsItem)
+	if err != nil {
+		return
+	}
 
 	*newsItems = append(*newsItems, newsItem)
 }
@@ -110,8 +122,10 @@ func getDistributors() []Distributor {
 	return distributors
 }
 
-func fraudCheck(item NewsItem) {
-	if item.Title == "" || item.Url == "" {
-		return
+func fraudCheck(item NewsItem) error {
+	if item.Title == "" || item.Url == "" || item.Title == "{{n.Title}}" {
+		return errors.New("DON'T ADD THIS YOU DUMB FUCK")
 	}
+
+	return nil
 }
