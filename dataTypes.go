@@ -24,5 +24,5 @@ type NewsItemDTO struct {
 	ID        int    `json:"id"`
 	Source    string `json:"source"`
 	FetchDate string `json:"fetch_date"`
-	RN        int    `json:"row_number"`
+	RN        int    `json:"-"`
 }

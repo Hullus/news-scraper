@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-func getLastArticles() ([]NewsItemDTO, error) {
+func getLastArticles() (map[string][]NewsItemDTO, error) {
 	getArticlesQuery := `SELECT *
 FROM (SELECT title, link, source, fetch_date,
              ROW_NUMBER() OVER (PARTITION BY source ORDER BY fetch_date DESC) AS rn
@@ -13,15 +13,20 @@ FROM (SELECT title, link, source, fetch_date,
 WHERE rn <= 10;`
 	rows, _ := db.Query(getArticlesQuery)
 
-	var newsItems []NewsItemDTO
-
+	newsItems := make(map[string][]NewsItemDTO)
 	for rows.Next() {
 		var newsItem NewsItemDTO
-		err := rows.Scan(&newsItem.Title, &newsItem.Url, &newsItem.Source, &newsItem.FetchDate, &newsItem.RN)
+		err := rows.Scan(&newsItem.Title,
+			&newsItem.Url,
+			&newsItem.Source,
+			&newsItem.FetchDate,
+			&newsItem.RN)
+
 		if err != nil {
 			return nil, err
 		}
-		newsItems = append(newsItems, newsItem)
+
+		newsItems[newsItem.Source] = append(newsItems[newsItem.Source], newsItem)
 	}
 
 	return newsItems, nil
@@ -29,11 +34,15 @@ WHERE rn <= 10;`
 
 func insertData(newsItems []NewsItem, provider string) error {
 	//Get latest article from DB
-	getLastArticleQuery := `SELECT * FROM news_articles WHERE source = $1 ORDER BY fetch_date LIMIT 1;`
-	row := db.QueryRow(getLastArticleQuery, provider)
+	getLastArticleQuery := `SELECT * FROM news_articles WHERE source = $1 ORDER BY fetch_date LIMIT 10;`
+	rows, _ := db.Query(getLastArticleQuery, provider)
 	lastArticle := NewsItem{}
 
-	err := row.Scan(&lastArticle.Title, &lastArticle.Url, &lastArticle.Source, &lastArticle.ID, &lastArticle.FetchDate)
+	err := rows.Scan(&lastArticle.Title,
+		&lastArticle.Url,
+		&lastArticle.Source,
+		&lastArticle.ID,
+		&lastArticle.FetchDate)
 	if err != nil {
 		return err
 	}
@@ -41,13 +50,13 @@ func insertData(newsItems []NewsItem, provider string) error {
 	//Start insert batch preparation
 	tx, err := db.Begin()
 	if err != nil {
-		panic(err)
+		fmt.Printf("could not start DB insert: %s\n", err)
 	}
 
 	insertArticleQuery := `INSERT INTO news_articles (title, link, source, fetch_date) VALUES ($1, $2, $3, $4)`
 	stmt, err := tx.Prepare(insertArticleQuery)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not prepare insert statement: %w", err)
 	}
 
 	defer stmt.Close()
@@ -62,7 +71,9 @@ func insertData(newsItems []NewsItem, provider string) error {
 		}
 	}
 
-	err = tx.Commit()
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("could not commit transaction: %w", err)
+	}
 
 	return nil
 }
