@@ -26,7 +26,7 @@ func main() {
 	db.SetMaxOpenConns(10)
 	db.SetMaxIdleConns(3)
 
-	//go scrapingScheduler()
+	go scrapingScheduler()
 
 	router.HandleFunc("GET /news", func(w http.ResponseWriter, r *http.Request) {
 		output, err := getLastArticles()
