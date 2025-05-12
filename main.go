@@ -52,7 +52,7 @@ func main() {
 func scrapingScheduler() {
 	runScraper()
 
-	ticker := time.NewTicker(1 * time.Minute)
+	ticker := time.NewTicker(3 * time.Minute)
 	defer ticker.Stop()
 
 	for {
